@@ -4,16 +4,15 @@ const app = express();
 const http = require('http');
 const server = http.createServer(app);
 
-// Налаштування заголовка CSP для HTTP серверу
+// Налаштування заголовка CSP для HTTP/HTTPS сервера
 app.use((req, res, next) => {
   res.setHeader('Content-Security-Policy', 
     "default-src 'self'; connect-src 'self' wss://*;");
   next();
 });
 
-
 // Створення WebSocket сервера
-const wss = new WebSocket.Server({ server }); // Прив'язуємо WebSocket сервер до HTTP сервера
+const wss = new WebSocket.Server({ server, path: '/ws' }); // Вказуємо шлях для WebSocket сервера
 
 const cameras = {}; // Об'єкт для зберігання підключених камер
 const clients = {}; // Об'єкт для зберігання підключених клієнтів
@@ -78,6 +77,7 @@ wss.on('connection', (ws, req) => {
   });
 });
 
-server.listen(7080, () => {
-  console.log('Сервер запущено');
+// Запускаємо сервер на Render
+server.listen(process.env.PORT || 7080, () => {
+  console.log('Сервер запущено на порту', process.env.PORT || 7080);
 });
