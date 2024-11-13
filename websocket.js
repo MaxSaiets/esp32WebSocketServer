@@ -1,6 +1,17 @@
+const express = require('express');
 const WebSocket = require('ws');
+const app = express();
+const http = require('http');
+const server = http.createServer(app);
 
-const wss = new WebSocket.Server({ port: 7080 });
+// Налаштування заголовка CSP для HTTP серверу
+app.use((req, res, next) => {
+  res.setHeader('Content-Security-Policy', "default-src 'self'; connect-src 'self' wss://esp32websocketserver.onrender.com");
+  next();
+});
+
+// Створення WebSocket сервера
+const wss = new WebSocket.Server({ server }); // Прив'язуємо WebSocket сервер до HTTP сервера
 
 const cameras = {}; // Об'єкт для зберігання підключених камер
 const clients = {}; // Об'єкт для зберігання підключених клієнтів
@@ -13,25 +24,20 @@ wss.on('connection', (ws, req) => {
     const { type, cameraId, boxId, frame } = data;
 
     if (type === 'camera') {
-      // Якщо це камера, зберігаємо її підключення
       cameras[cameraId] = ws;
       console.log(`Камера ${cameraId} підключена`);
     } else if (type === 'client') {
-      // Якщо це клієнт, зберігаємо його підключення
       if (!clients[boxId]) {
         clients[boxId] = [];
       }
       clients[boxId].push(ws);
       console.log(`Клієнт підключений до боксу ${boxId}`);
-      // Запитуємо кадри від відповідної камери
       if (cameras[boxId]) {
-        console.log("Запит кадрів від камери", boxId);
         cameras[boxId].send(JSON.stringify({ type: 'request', boxId }));
       } else {
         ws.send(JSON.stringify({ type: 'error', message: 'Камера не підключена' }));
       }
     } else if (type === 'frame') {
-      // Якщо це кадр від камери, передаємо його відповідним клієнтам
       if (clients[cameraId]) {
         clients[cameraId].forEach((client) => {
           if (client.readyState === WebSocket.OPEN) {
@@ -40,7 +46,6 @@ wss.on('connection', (ws, req) => {
         });
       }
     } else if (type === 'getStatus') {
-      // Якщо це запит на статус, виводимо список підключених камер і клієнтів у консоль
       const cameraList = Object.keys(cameras);
       const clientList = Object.keys(clients);
       console.log('Підключені камери:', cameraList);
@@ -50,7 +55,6 @@ wss.on('connection', (ws, req) => {
 
   ws.on('close', () => {
     console.log('Клієнт відключився');
-    // Видаляємо камеру або клієнта з об'єктів cameras і clients, якщо вони відключилися
     for (const cameraId in cameras) {
       if (cameras[cameraId] === ws) {
         delete cameras[cameraId];
@@ -72,4 +76,6 @@ wss.on('connection', (ws, req) => {
   });
 });
 
-console.log('WebSocket сервер запущено на ws://localhost:7080');
+server.listen(7080, () => {
+  console.log('Сервер запущено на http://localhost:7080');
+});
