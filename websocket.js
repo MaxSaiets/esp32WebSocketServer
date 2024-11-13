@@ -6,9 +6,11 @@ const server = http.createServer(app);
 
 // Налаштування заголовка CSP для HTTP серверу
 app.use((req, res, next) => {
-  res.setHeader('Content-Security-Policy', "default-src 'self'; connect-src 'self' wss://esp32websocketserver.onrender.com");
+  res.setHeader('Content-Security-Policy', 
+    "default-src 'self'; connect-src 'self' wss://*;");
   next();
 });
+
 
 // Створення WebSocket сервера
 const wss = new WebSocket.Server({ server }); // Прив'язуємо WebSocket сервер до HTTP сервера
@@ -77,5 +79,5 @@ wss.on('connection', (ws, req) => {
 });
 
 server.listen(7080, () => {
-  console.log('Сервер запущено на http://localhost:7080');
+  console.log('Сервер запущено');
 });
