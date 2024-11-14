@@ -42,7 +42,8 @@ wss.on('connection', (ws, req) => {
       if (clients[cameraId]) {
         clients[cameraId].forEach((client) => {
           if (client.readyState === WebSocket.OPEN) {
-            client.send(JSON.stringify({ type: 'frame', frame: frame.replace(/^data:image\/jpeg;base64,/, '') }));
+            // client.send(JSON.stringify({ type: 'frame', frame: frame.replace(/^data:image\/jpeg;base64,/, '') }));
+            client.send(frame);
           }
         });
       }
