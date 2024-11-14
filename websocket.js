@@ -39,11 +39,13 @@ wss.on('connection', (ws, req) => {
         ws.send(JSON.stringify({ type: 'error', message: 'Камера не підключена' }));
       }
     } else if (type === 'frame') {
+      console.log('Отримано кадр від камери');
+
+      // Якщо камера підключена до клієнта, надсилаємо кадр клієнту
       if (clients[cameraId]) {
         clients[cameraId].forEach((client) => {
           if (client.readyState === WebSocket.OPEN) {
-            // client.send(JSON.stringify({ type: 'frame', frame: frame.replace(/^data:image\/jpeg;base64,/, '') }));
-            client.send(frame);
+            client.send(JSON.stringify({ type: 'frame', frame }));
           }
         });
       }
