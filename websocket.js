@@ -21,12 +21,14 @@ wss.on('connection', (ws, req) => {
   
   ws.on('message', (message) => {
     let data;
-    if (Buffer.isBuffer(message)) {
-      data = message;
-    } else {
-        data = JSON.parse(message.toString()); // Пробуємо парсити JSON
+    
+    try{
+      data = JSON.parse(message.toString());
+      console.log(typeof(data))
+    } catch (error) {
+        console.error('Помилка при обробці повідомлення:', error.message);
     }
-      
+    
     if (typeof data === 'object') {
       const { type, cameraId, boxId } = data;
 
