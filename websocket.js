@@ -18,12 +18,12 @@ const clients = {}; // Зберігання підключених клієнт�
 
 wss.on('connection', (ws, req) => {
   console.log('Підключено нового клієнта');
-  
-  ws.on('message', (message) => {
-    let data;
-    data = JSON.parse(message.toString())
 
-    if (typeof data === 'object') {
+  ws.on('message', (message) => {
+  try {
+    // Перевіряємо, чи це текстове повідомлення
+    if (typeof message === 'string' || message instanceof String) {
+      const data = JSON.parse(message);
       const { type, cameraId, boxId } = data;
 
       if (type === 'camera') {
@@ -51,25 +51,32 @@ wss.on('connection', (ws, req) => {
         console.log('Підключені камери:', cameraList);
         console.log('Підключені клієнти:', clientList);
       }
-    } else {
-      // Обробка бінарних даних (наприклад, кадрів з камери)
-      console.log('Received binary frame data of length: ' + data.length);
+    } else if (Buffer.isBuffer(message)) {
+      // Це бінарні дані (наприклад, кадри з камери)
+      console.log('Отримано бінарні дані довжиною:', message.length);
 
-      // Знаходимо перший клієнт для відповідного cameraId
+      // Знаходимо клієнтів для відповідного cameraId
       for (const cameraId in clients) {
         const clientList = clients[cameraId];
         if (clientList && clientList.length > 0) {
           const firstClient = clientList[0];
           if (firstClient.readyState === WebSocket.OPEN) {
-            firstClient.send(data); // Відправляємо кадр лише першому клієнту
+            firstClient.send(message); // Відправляємо кадр лише першому клієнту
             console.log(`Кадр від камери ${cameraId} надіслано першому клієнту`);
           } else {
-            console.log(`Клієнт ${cameraId} не готовий до отримання кадру`);
+            console.log(`Клієнт для камери ${cameraId} не готовий до отримання кадру`);
           }
         }
       }
+    } else {
+      console.error('Отримано невідомий тип даних');
     }
-  });
+  } catch (error) {
+    console.error('Помилка при обробці повідомлення:', error);
+  }
+});
+
+ 
 
   ws.on('close', () => {
     console.log('Клієнт відключився');
