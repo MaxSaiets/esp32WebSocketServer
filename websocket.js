@@ -23,8 +23,11 @@ wss.on('connection', (ws, req) => {
     let data;
     
     try{
-      data = JSON.parse(message.toString());
-      console.log(typeof(data))
+      if(typeof JSON.parse(message.toString()) === 'object'){
+        data = JSON.parse(message.toString());
+      } else {
+        data = message;
+      }
     } catch (error) {
         console.error('Помилка при обробці повідомлення:', error.message);
     }
