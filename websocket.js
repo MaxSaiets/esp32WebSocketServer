@@ -21,14 +21,10 @@ wss.on('connection', (ws, req) => {
   
   ws.on('message', (message) => {
     let data;
-    try {
-        data = JSON.parse(message.toString())
-        if (typeof data !== 'object') {
-          data = message;
-        }
-    } catch (error) {
-      console.error('Помилка при обробці повідомлення:', error.message);
-      return; // Завершуємо обробку у випадку помилки
+    if (Buffer.isBuffer(message)) {
+      data = message;
+    } else {
+        data = JSON.parse(message.toString()); // Пробуємо парсити JSON
     }
       
     if (typeof data === 'object') {
