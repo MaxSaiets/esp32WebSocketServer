@@ -21,13 +21,19 @@ wss.on('connection', (ws, req) => {
   
   ws.on('message', (message) => {
     let data;
-    try{
-      data = JSON.parse(message.toString())
-      if(typeof data === 'object'){
-        data = JSON.parse(message.toString());
-      } else{
-        data = message;
-      }
+    try {
+    // Перевіряємо, чи це текстове повідомлення (JSON)
+      if (typeof message === 'string' || message instanceof String) {
+        data = JSON.parse(message); // Парсимо текст у об'єкт
+        } else if (Buffer.isBuffer(message)) {
+          // Якщо це бінарні дані, залишаємо їх без змін
+          data = message;
+        } else {
+          throw new Error('Unknown message type');
+        }
+    } catch (error) {
+      console.error('Помилка при обробці повідомлення:', error.message);
+      return; // Завершуємо обробку у випадку помилки
     }
       
     if (typeof data === 'object') {
