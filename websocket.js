@@ -28,14 +28,15 @@ wss.on('connection', (ws, req) => {
   
       // Перевіряємо, з якої камери надійшов кадр
       const { cameraId } = message;  // Переконайтесь, що cameraId передається разом з бінарними даними
-      if (clients[cameraId]) {
-        clients[cameraId].forEach((client) => {
+
+          // for (const cameraId in cameras) {
+
+        clients[0].forEach((client) => {
           if (client.readyState === WebSocket.OPEN) {
             // Надсилаємо бінарні кадри іншим клієнтам
             client.send(message);
           }
         });
-      }
     } else {
       // Якщо це текстові дані (JSON)
       let data;
