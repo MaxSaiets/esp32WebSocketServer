@@ -1,4 +1,4 @@
-  const express = require('express');
+const express = require('express');
 const WebSocket = require('ws');
 const app = express();
 const http = require('http');
@@ -6,76 +6,75 @@ const server = http.createServer(app);
 
 // Налаштування заголовка CSP для HTTP/HTTPS сервера
 app.use((req, res, next) => {
-  res.setHeader('Content-Security-Policy', 
-    "default-src 'self'; connect-src 'self' wss://*;");
+  res.setHeader('Content-Security-Policy', "default-src 'self'; connect-src 'self' wss://*;");
   next();
 });
 
 // Створення WebSocket сервера
-const wss = new WebSocket.Server({ server, path: '/ws' }); // Вказуємо шлях для WebSocket сервера
+const wss = new WebSocket.Server({ server, path: '/ws' });
 
-const cameras = {}; // Об'єкт для зберігання підключених камер
-const clients = {}; // Об'єкт для зберігання підключених клієнтів
+const cameras = {}; // Зберігання підключених камер
+const clients = {}; // Зберігання підключених клієнтів
 
 wss.on('connection', (ws, req) => {
   console.log('Підключено нового клієнта');
 
   ws.on('message', (message) => {
-    // Перевіряємо, чи це бінарні дані
-    if (Buffer.isBuffer(message)) {
-      // Якщо це бінарні дані (наприклад, кадр з камери)
-      console.log('Received binary frame data of length: ' + message.length);
-  
-      // Перевіряємо, з якої камери надійшов кадр
-      const { cameraId } = message;  // Переконайтесь, що cameraId передається разом з бінарними даними
-
-          // for (const cameraId in cameras) {
-
-        if(clients[0]){
-            client.send(message);
-        }
-    } else {
-      // Якщо це текстові дані (JSON)
+    // Перевіряємо, чи це текстові дані (JSON)
+    if (!Buffer.isBuffer(message)) {
       let data;
       try {
-        data = JSON.parse(message);  // Пробуємо розпарсити як JSON
+        data = JSON.parse(message); // Парсимо JSON
       } catch (e) {
         console.log('Невірний формат JSON:', e);
         return;
       }
-  
-      const { type, cameraId, boxId, frame } = data;
-  
+
+      const { type, cameraId, boxId } = data;
+
       if (type === 'camera') {
+        // Камера підключилася
         cameras[cameraId] = ws;
         console.log(`Камера ${cameraId} підключена`);
       } else if (type === 'client') {
+        // Клієнт підключився до боксу
         if (!clients[boxId]) {
           clients[boxId] = [];
         }
         clients[boxId].push(ws);
         console.log(`Клієнт підключений до боксу ${boxId}`);
+
+        // Надсилаємо запит камері на передачу кадрів
         if (cameras[boxId]) {
           cameras[boxId].send(JSON.stringify({ type: 'request', boxId }));
         } else {
           ws.send(JSON.stringify({ type: 'error', message: 'Камера не підключена' }));
         }
-      } else if (type === 'frame') {
-        // Якщо отримуємо кадр, відправляємо його всім підключеним клієнтам
-        if (clients[cameraId]) {
-          clients[cameraId].forEach((client) => {
-            if (client.readyState === WebSocket.OPEN) {
-              client.send(JSON.stringify({ type: 'frame', frame: frame.replace(/^data:image\/jpeg;base64,/, '') }));
-            }
-          });
-        }
       } else if (type === 'getStatus') {
+        // Запит статусу підключених камер і клієнтів
         const cameraList = Object.keys(cameras);
         const clientList = Object.keys(clients);
         console.log('Підключені камери:', cameraList);
         console.log('Підключені клієнти:', clientList);
       }
-    } 
+    } else {
+      // Обробка бінарних даних (наприклад, кадрів з камери)
+      console.log('Received binary frame data of length: ' + message.length);
+
+      // Знаходимо перший клієнт для відповідного cameraId
+      for (const cameraId in clients) {
+        const clientList = clients[cameraId];
+        if (clientList && clientList.length > 0) {
+          const firstClient = clientList[0];
+          if (firstClient.readyState === WebSocket.OPEN) {
+            firstClient.send(message); // Відправляємо кадр лише першому клієнту
+            console.log(`Кадр від камери ${cameraId} надіслано першому клієнту`);
+          } else {
+            console.log(`Клієнт ${cameraId} не готовий до отримання кадру`);
+          }
+        }
+      }
+    }
   });
 
   ws.on('close', () => {
@@ -101,7 +100,7 @@ wss.on('connection', (ws, req) => {
   });
 });
 
-// Запускаємо сервер на Render
+// Запускаємо сервер
 server.listen(process.env.PORT || 7080, () => {
   console.log('Сервер запущено на порту', process.env.PORT || 7080);
 });
