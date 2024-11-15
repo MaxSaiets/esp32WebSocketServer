@@ -1,4 +1,4 @@
-const express = require('express');
+  const express = require('express');
 const WebSocket = require('ws');
 const app = express();
 const http = require('http');
@@ -39,7 +39,7 @@ wss.on('connection', (ws, req) => {
         ws.send(JSON.stringify({ type: 'error', message: 'Камера не підключена' }));
       }
     } else if (type === 'frame') {
-      console.log('Отримано кадр від камери');
+      console.log('Отримано кадр від камери', frame);
 
       // Якщо камера підключена до клієнта, надсилаємо кадр клієнту
       if (clients[cameraId]) {
