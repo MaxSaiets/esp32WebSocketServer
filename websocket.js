@@ -31,12 +31,9 @@ wss.on('connection', (ws, req) => {
 
           // for (const cameraId in cameras) {
 
-        clients[0].forEach((client) => {
-          if (client.readyState === WebSocket.OPEN) {
-            // Надсилаємо бінарні кадри іншим клієнтам
+        if(clients[0]){
             client.send(message);
-          }
-        });
+        }
     } else {
       // Якщо це текстові дані (JSON)
       let data;
