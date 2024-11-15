@@ -24,6 +24,21 @@ wss.on('connection', (ws, req) => {
     const data = JSON.parse(message);
     const { type, cameraId, boxId, frame } = data;
 
+    if (Buffer.isBuffer(message)) {
+      // Це бінарні дані кадру
+      console.log('Received binary frame data of length: ' + message.length);
+
+      // Ваша логіка для обробки бінарних даних
+      if (clients[cameraId]) {
+        clients[cameraId].forEach((client) => {
+          if (client.readyState === WebSocket.OPEN) {
+            // Надсилаємо бінарні кадри іншим клієнтам
+            client.send(message);
+          }
+        });
+      }
+    } 
+    
     if (type === 'camera') {
       cameras[cameraId] = ws;
       console.log(`Камера ${cameraId} підключена`);
