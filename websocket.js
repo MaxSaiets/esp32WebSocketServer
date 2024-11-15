@@ -18,18 +18,12 @@ const clients = {}; // Зберігання підключених клієнт�
 
 wss.on('connection', (ws, req) => {
   console.log('Підключено нового клієнта');
-
+  
   ws.on('message', (message) => {
-    // Перевіряємо, чи це текстові дані (JSON)
-    if (!Buffer.isBuffer(message)) {
-      let data;
-      try {
-        data = JSON.parse(message); // Парсимо JSON
-      } catch (e) {
-        console.log('Невірний формат JSON:', e);
-        return;
-      }
+    let data;
+    data = JSON.parse(message.toString())
 
+    if (typeof data === 'object') {
       const { type, cameraId, boxId } = data;
 
       if (type === 'camera') {
@@ -59,7 +53,7 @@ wss.on('connection', (ws, req) => {
       }
     } else {
       // Обробка бінарних даних (наприклад, кадрів з камери)
-      console.log('Received binary frame data of length: ' + message.length);
+      console.log('Received binary frame data of length: ' + data.length);
 
       // Знаходимо перший клієнт для відповідного cameraId
       for (const cameraId in clients) {
@@ -67,7 +61,7 @@ wss.on('connection', (ws, req) => {
         if (clientList && clientList.length > 0) {
           const firstClient = clientList[0];
           if (firstClient.readyState === WebSocket.OPEN) {
-            firstClient.send(message); // Відправляємо кадр лише першому клієнту
+            firstClient.send(data); // Відправляємо кадр лише першому клієнту
             console.log(`Кадр від камери ${cameraId} надіслано першому клієнту`);
           } else {
             console.log(`Клієнт ${cameraId} не готовий до отримання кадру`);
