@@ -21,14 +21,13 @@ wss.on('connection', (ws, req) => {
   console.log('Підключено нового клієнта');
 
   ws.on('message', (message) => {
-    const data = JSON.parse(message);
-    const { type, cameraId, boxId, frame } = data;
-
+    // Перевіряємо, чи це бінарні дані
     if (Buffer.isBuffer(message)) {
-      // Це бінарні дані кадру
+      // Якщо це бінарні дані (наприклад, кадр з камери)
       console.log('Received binary frame data of length: ' + message.length);
-
-      // Ваша логіка для обробки бінарних даних
+  
+      // Перевіряємо, з якої камери надійшов кадр
+      const { cameraId } = message;  // Переконайтесь, що cameraId передається разом з бінарними даними
       if (clients[cameraId]) {
         clients[cameraId].forEach((client) => {
           if (client.readyState === WebSocket.OPEN) {
@@ -37,39 +36,48 @@ wss.on('connection', (ws, req) => {
           }
         });
       }
+    } else {
+      // Якщо це текстові дані (JSON)
+      let data;
+      try {
+        data = JSON.parse(message);  // Пробуємо розпарсити як JSON
+      } catch (e) {
+        console.log('Невірний формат JSON:', e);
+        return;
+      }
+  
+      const { type, cameraId, boxId, frame } = data;
+  
+      if (type === 'camera') {
+        cameras[cameraId] = ws;
+        console.log(`Камера ${cameraId} підключена`);
+      } else if (type === 'client') {
+        if (!clients[boxId]) {
+          clients[boxId] = [];
+        }
+        clients[boxId].push(ws);
+        console.log(`Клієнт підключений до боксу ${boxId}`);
+        if (cameras[boxId]) {
+          cameras[boxId].send(JSON.stringify({ type: 'request', boxId }));
+        } else {
+          ws.send(JSON.stringify({ type: 'error', message: 'Камера не підключена' }));
+        }
+      } else if (type === 'frame') {
+        // Якщо отримуємо кадр, відправляємо його всім підключеним клієнтам
+        if (clients[cameraId]) {
+          clients[cameraId].forEach((client) => {
+            if (client.readyState === WebSocket.OPEN) {
+              client.send(JSON.stringify({ type: 'frame', frame: frame.replace(/^data:image\/jpeg;base64,/, '') }));
+            }
+          });
+        }
+      } else if (type === 'getStatus') {
+        const cameraList = Object.keys(cameras);
+        const clientList = Object.keys(clients);
+        console.log('Підключені камери:', cameraList);
+        console.log('Підключені клієнти:', clientList);
+      }
     } 
-    
-    if (type === 'camera') {
-      cameras[cameraId] = ws;
-      console.log(`Камера ${cameraId} підключена`);
-    } else if (type === 'client') {
-      if (!clients[boxId]) {
-        clients[boxId] = [];
-      }
-      clients[boxId].push(ws);
-      console.log(`Клієнт підключений до боксу ${boxId}`);
-      if (cameras[boxId]) {
-        cameras[boxId].send(JSON.stringify({ type: 'request', boxId }));
-      } else {
-        ws.send(JSON.stringify({ type: 'error', message: 'Камера не підключена' }));
-      }
-    } else if (type === 'frame') {
-      console.log('Отримано кадр від камери', frame);
-
-      // Якщо камера підключена до клієнта, надсилаємо кадр клієнту
-      if (clients[cameraId]) {
-        clients[cameraId].forEach((client) => {
-          if (client.readyState === WebSocket.OPEN) {
-            client.send(JSON.stringify({ type: 'frame', frame }));
-          }
-        });
-      }
-    } else if (type === 'getStatus') {
-      const cameraList = Object.keys(cameras);
-      const clientList = Object.keys(clients);
-      console.log('Підключені камери:', cameraList);
-      console.log('Підключені клієнти:', clientList);
-    }
   });
 
   ws.on('close', () => {
