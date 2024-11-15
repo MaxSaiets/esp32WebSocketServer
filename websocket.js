@@ -62,7 +62,7 @@ wss.on('connection', (ws, req) => {
       }
     } else {
       // Обробка бінарних даних (наприклад, кадрів з камери)
-      console.log('Received binary frame data of length: ' + data.length);
+      console.log('Received binary frame data of length: ' + message.length);
 
       // Знаходимо перший клієнт для відповідного cameraId
       for (const cameraId in clients) {
@@ -70,7 +70,7 @@ wss.on('connection', (ws, req) => {
         if (clientList && clientList.length > 0) {
           const firstClient = clientList[0];
           if (firstClient.readyState === WebSocket.OPEN) {
-            firstClient.send(data); // Відправляємо кадр лише першому клієнту
+            firstClient.send(message); // Відправляємо кадр лише першому клієнту
             console.log(`Кадр від камери ${cameraId} надіслано першому клієнту`);
           } else {
             console.log(`Клієнт ${cameraId} не готовий до отримання кадру`);
