@@ -3,6 +3,7 @@ const WebSocket = require('ws');
 const app = express();
 const http = require('http');
 const server = http.createServer(app);
+const wsToCameraId = new Map();   // Відповідність між WebSocket-з'єднанням і cameraId
 
 // Налаштування заголовка CSP для HTTP/HTTPS сервера
 app.use((req, res, next) => {
@@ -21,22 +22,20 @@ wss.on('connection', (ws, req) => {
   
   ws.on('message', (message) => {
     let data;
-    try{
-      if(typeof JSON.parse(message.toString()) === 'object'){
-        data = JSON.parse(message.toString());
-      } else {
-        data = message;
-      }
+    try {
+      data = JSON.parse(message.toString());
     } catch (error) {
-        // console.error('Помилка при обробці повідомлення:', error.message);
+      // Якщо не вдалося розпарсити як JSON, вважаємо, що це бінарні дані
+      data = message;
     }
     
-    if (typeof data === 'object') {
+    if (typeof data === 'object' && !Buffer.isBuffer(data)) {
       const { type, cameraId, boxId, command, angle, steps, direction } = data;
 
       if (type === 'camera') {
         // Камера підключилася
         cameras[cameraId] = ws;
+        wsToCameraId.set(ws, cameraId);
         console.log(`Камера ${cameraId} підключена`);
       } else if (type === 'client') {
         // Клієнт підключився до боксу
@@ -53,7 +52,7 @@ wss.on('connection', (ws, req) => {
           ws.send(JSON.stringify({ type: 'error', message: 'Камера не підключена' }));
         }
       } else if (type === 'command') {
-        console.log("Команда", type, cameraId, boxId, command, angle, steps, direction)
+        console.log("Команда", type, cameraId, boxId, command, angle, steps, direction);
         // Обробка команд для керування ESP-32 CAM
         if (cameras[boxId]) {
           cameras[boxId].send(JSON.stringify({ command, angle, steps, direction }));
@@ -68,11 +67,16 @@ wss.on('connection', (ws, req) => {
         console.log('Підключені клієнти:', clientList);
         ws.send(JSON.stringify({ type: 'status', cameras: cameraList, clients: clientList }));
       }
-    }  else {
+    } else {
       // Обробка бінарних даних (наприклад, кадрів з камери)
-      // console.log('Received binary frame data of length: ' + message.length);
+      console.log('Received binary frame data of length: ' + message.length);
 
       // Знаходимо клієнтів для відповідного cameraId
+      const cameraId = wsToCameraId.get(ws);
+      if (!cameraId) {
+        console.error('Не вдалося знайти cameraId для поточного WebSocket-з\'єднання');
+        return;
+      }
       const clientList = clients[cameraId];
       if (clientList && clientList.length > 0) {
         clientList.forEach(client => {
@@ -89,12 +93,11 @@ wss.on('connection', (ws, req) => {
 
   ws.on('close', () => {
     console.log('Клієнт відключився');
-    for (const cameraId in cameras) {
-      if (cameras[cameraId] === ws) {
-        delete cameras[cameraId];
-        console.log(`Камера ${cameraId} відключена`);
-        break;
-      }
+    const cameraId = wsToCameraId.get(ws);
+    if (cameraId) {
+      delete cameras[cameraId];
+      wsToCameraId.delete(ws);
+      console.log(`Камера ${cameraId} відключена`);
     }
     for (const boxId in clients) {
       clients[boxId] = clients[boxId].filter((client) => client !== ws);
