@@ -20,7 +20,7 @@ wss.on('connection', (ws, req) => {
   console.log('Підключено нового клієнта');
   
   ws.on('message', (message) => {
-    if (typeof message === 'string') {
+    if (typeof message === 'string' || message instanceof String) {
       let data;
       try {
         data = JSON.parse(message);
