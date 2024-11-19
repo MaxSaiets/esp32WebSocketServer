@@ -22,18 +22,15 @@ wss.on('connection', (ws, req) => {
   ws.on('message', (message) => {
     let data;
     
-    try{
-      if(typeof JSON.parse(message.toString()) === 'object'){
-        data = JSON.parse(message.toString());
-      } else {
-        data = message;
-      }
+    try {
+      data = JSON.parse(message.toString());
     } catch (error) {
-        console.error('Помилка при обробці повідомлення:', error.message);
+      console.error('Помилка при обробці повідомлення:', error.message);
+      return;
     }
     
     if (typeof data === 'object') {
-      const { type, cameraId, boxId } = data;
+      const { type, cameraId, boxId, command, angle, steps, direction } = data;
 
       if (type === 'camera') {
         // Камера підключилася
@@ -53,12 +50,20 @@ wss.on('connection', (ws, req) => {
         } else {
           ws.send(JSON.stringify({ type: 'error', message: 'Камера не підключена' }));
         }
+      } else if (type === 'command') {
+        // Обробка команд для керування ESP-32 CAM
+        if (cameras[boxId]) {
+          cameras[boxId].send(JSON.stringify({ command, angle, steps, direction }));
+        } else {
+          ws.send(JSON.stringify({ type: 'error', message: 'Камера не підключена' }));
+        }
       } else if (type === 'getStatus') {
         // Запит статусу підключених камер і клієнтів
         const cameraList = Object.keys(cameras);
         const clientList = Object.keys(clients);
         console.log('Підключені камери:', cameraList);
         console.log('Підключені клієнти:', clientList);
+        ws.send(JSON.stringify({ type: 'status', cameras: cameraList, clients: clientList }));
       }
     } else {
       // Обробка бінарних даних (наприклад, кадрів з камери)
