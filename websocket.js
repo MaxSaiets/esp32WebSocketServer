@@ -20,16 +20,15 @@ wss.on('connection', (ws, req) => {
   console.log('Підключено нового клієнта');
   
   ws.on('message', (message) => {
-    let data;
-    
-    try {
-      data = JSON.parse(message.toString());
-    } catch (error) {
-      console.error('Помилка при обробці повідомлення:', error.message);
-      return;
-    }
-    
-    if (typeof data === 'object') {
+    if (typeof message === 'string') {
+      let data;
+      try {
+        data = JSON.parse(message);
+      } catch (error) {
+        console.error('Помилка при обробці повідомлення:', error.message);
+        return;
+      }
+
       const { type, cameraId, boxId, command, angle, steps, direction } = data;
 
       if (type === 'camera') {
