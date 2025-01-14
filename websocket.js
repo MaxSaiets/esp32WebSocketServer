@@ -20,69 +20,76 @@ const clients = {}; // Зберігання підключених клієнт�
 wss.on('connection', (ws, req) => {
   console.log('Підключено нового клієнта');
   
-  // Обробка запиту клієнта
-ws.on('message', (message) => {
-  let data;
-  try {
-    data = JSON.parse(message.toString());
-  } catch (error) {
-    data = message; // Обробка бінарних даних
-  }
+  ws.on('message', (message) => {
+    let data;
+    try {
+      data = JSON.parse(message.toString());
+    } catch (error) {
+      // Якщо не вдалося розпарсити як JSON, вважаємо, що це бінарні дані
+      data = message;
+    }
+    
+    if (typeof data === 'object' && !Buffer.isBuffer(data)) {
+      const { type, cameraId, boxId, command, angle, steps, direction } = data;
 
-  if (typeof data === 'object' && !Buffer.isBuffer(data)) {
-    const { type, cameraId, boxId, command, angle, steps, direction } = data;
-
-    if (type === 'client') {
-      // Клієнт підключився
-      const singleCameraId = Object.keys(cameras)[0]; // Єдина камера в масиві
-
-      if (singleCameraId) {
-        // Якщо єдина камера існує
-        if (!clients[singleCameraId]) {
-          clients[singleCameraId] = [];
+      if (type === 'camera') {
+        // Камера підключилася
+        cameras[cameraId] = ws;
+        wsToCameraId.set(ws, cameraId);
+        console.log(`Камера ${cameraId} підключена`);
+      } else if (type === 'client') {
+        // Клієнт підключився до боксу
+        if (!clients[boxId]) {
+          clients[boxId] = [];
         }
-        clients[singleCameraId].push(ws);
-        console.log(`Клієнт підключений до камери ${singleCameraId}`);
+        clients[boxId].push(ws);
+        console.log(`Клієнт підключений до боксу ${boxId}`);
 
-        // Надсилаємо запит єдиній камері на передачу кадрів
-        cameras[singleCameraId].send(JSON.stringify({ type: 'request', boxId: singleCameraId }));
-      } else {
-        ws.send(JSON.stringify({ type: 'error', message: 'Жодна камера не підключена' }));
-      }
-    } else if (type === 'command') {
-      // Обробка команди
-      const singleCameraId = Object.keys(cameras)[0]; // Єдина камера в масиві
-
-      if (singleCameraId) {
-        cameras[singleCameraId].send(JSON.stringify({ command, angle, steps, direction }));
-        console.log(`Команду надіслано камері ${singleCameraId}`);
-      } else {
-        ws.send(JSON.stringify({ type: 'error', message: 'Жодна камера не підключена' }));
-      }
-    }
-  } else {
-    // Обробка бінарних даних
-    console.log('Received binary frame data of length: ' + message.length);
-
-    const singleCameraId = Object.keys(cameras)[0]; // Єдина камера в масиві
-    if (!singleCameraId) {
-      console.error('Жодна камера не підключена для передачі даних');
-      return;
-    }
-
-    const clientList = clients[singleCameraId];
-    if (clientList && clientList.length > 0) {
-      clientList.forEach(client => {
-        if (client.readyState === WebSocket.OPEN) {
-          client.send(message); // Відправляємо кадри клієнтам
-          console.log(`Кадр від камери ${singleCameraId} надіслано клієнту`);
+        // Надсилаємо запит камері на передачу кадрів
+        if (cameras[boxId]) {
+          cameras[boxId].send(JSON.stringify({ type: 'request', boxId }));
         } else {
-          console.log(`Клієнт ${singleCameraId} не готовий до отримання кадру`);
+          ws.send(JSON.stringify({ type: 'error', message: 'Камера не підключена' }));
         }
-      });
+      } else if (type === 'command') {
+        console.log("Команда", type, cameraId, boxId, command, angle, steps, direction);
+        // Обробка команд для керування ESP-32 CAM
+        if (cameras[boxId]) {
+          cameras[boxId].send(JSON.stringify({ command, angle, steps, direction }));
+        } else {
+          ws.send(JSON.stringify({ type: 'error', message: 'Камера не підключена' }));
+        }
+      } else if (type === 'getStatus') {
+        // Запит статусу підключених камер і клієнтів
+        const cameraList = Object.keys(cameras);
+        const clientList = Object.keys(clients);
+        console.log('Підключені камери:', cameraList);
+        console.log('Підключені клієнти:', clientList);
+        ws.send(JSON.stringify({ type: 'status', cameras: cameraList, clients: clientList }));
+      }
+    } else {
+      // Обробка бінарних даних (наприклад, кадрів з камери)
+      console.log('Received binary frame data of length: ' + message.length);
+
+      // Знаходимо клієнтів для відповідного cameraId
+      const cameraId = wsToCameraId.get(ws);
+      if (!cameraId) {
+        console.error('Не вдалося знайти cameraId для поточного WebSocket-з\'єднання');
+        return;
+      }
+      const clientList = clients[cameraId];
+      if (clientList && clientList.length > 0) {
+        clientList.forEach(client => {
+          if (client.readyState === WebSocket.OPEN) {
+            client.send(message); // Відправляємо кадр клієнтам з відповідним cameraId
+            console.log(`Кадр від камери ${cameraId} надіслано клієнту`);
+          } else {
+            console.log(`Клієнт ${cameraId} не готовий до отримання кадру`);
+          }
+        });
+      }
     }
-  }
-});
+  });
 
   ws.on('close', () => {
     console.log('Клієнт відключився');
