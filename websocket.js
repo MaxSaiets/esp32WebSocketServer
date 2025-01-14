@@ -1,4 +1,26 @@
-// Обробка запиту клієнта
+const express = require('express');
+const WebSocket = require('ws');
+const app = express();
+const http = require('http');
+const server = http.createServer(app);
+const wsToCameraId = new Map();   // Відповідність між WebSocket-з'єднанням і cameraId
+
+// Налаштування заголовка CSP для HTTP/HTTPS сервера
+app.use((req, res, next) => {
+  res.setHeader('Content-Security-Policy', "default-src 'self'; connect-src 'self' wss://*;");
+  next();
+});
+
+// Створення WebSocket сервера
+const wss = new WebSocket.Server({ server, path: '/ws' });
+
+const cameras = {}; // Зберігання підключених камер
+const clients = {}; // Зберігання підключених клієнтів
+
+wss.on('connection', (ws, req) => {
+  console.log('Підключено нового клієнта');
+  
+  // Обробка запиту клієнта
 ws.on('message', (message) => {
   let data;
   try {
@@ -60,4 +82,31 @@ ws.on('message', (message) => {
       });
     }
   }
+});
+
+  ws.on('close', () => {
+    console.log('Клієнт відключився');
+    const cameraId = wsToCameraId.get(ws);
+    if (cameraId) {
+      delete cameras[cameraId];
+      wsToCameraId.delete(ws);
+      console.log(`Камера ${cameraId} відключена`);
+    }
+    for (const boxId in clients) {
+      clients[boxId] = clients[boxId].filter((client) => client !== ws);
+      if (clients[boxId].length === 0) {
+        delete clients[boxId];
+      }
+      console.log(`Клієнт відключений від боксу ${boxId}`);
+    }
+  });
+
+  ws.on('error', (error) => {
+    console.error('Помилка WebSocket:', error);
+  });
+});
+
+// Запускаємо сервер
+server.listen(process.env.PORT || 7080, () => {
+  console.log('Сервер запущено на порту', process.env.PORT || 7080);
 });
